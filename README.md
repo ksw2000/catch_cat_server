@@ -67,17 +67,17 @@ Powered by Golang
 + `friend_id` *int* **key** (auto-generated)
 + `user_id_src` int **foreign key**
 + `user_id_dest` int **foreign key**
-+ `invited` *boolean* (src 向 dest 邀請)
-+ `block` *boolean* (src 向 dest 封鎖)
++ `accepted` *boolean* (src 向 dest 邀請，dest 是否已接收)
++ `ban` *boolean* (src 向 dest 封鎖)
 
 > 當 a 與 b 有好友關係時，雙向都要加入，刪除好友關係時雙向也都要刪除
 
 ## API
 
-### user, friend
+### user
 
 ```
-/POST/register (向資料庫註冊新用戶)
+/POST/register (向資料庫註冊新用戶)✅
     - password
     - confirm_password
     - email
@@ -85,25 +85,30 @@ Powered by Golang
 
 檢查 name 字元數 < 10
 檢查 password 是否等於 confirm_password
-檢查 email 格式
-(寄發 email 確認：太麻煩先跳過)
+檢查 email 格式 ❌
+(寄發 email 確認：太麻煩先跳過)  ❌
 產生 uid (12位數數字), 產生時檢查是否可用
 產生 salt (256位a-zA-Z0-0)
 產生 hash 後的 password
 寫入資料庫
 
+HTTP 200 成功，但不符合規定
+HTTP 201 成功，成功建立資源
+
 retrun
-	- ok (boolean)
 	- error (string)
 ```
 
 ```
-/POST/login (向資料庫查尋用戶)
+/POST/login (向資料庫查尋用戶)✅
 	- passowrd
 	- email
 根據 email 查尋資料庫
 比對密碼
 若成功則寫入 session
+
+HTTP 200 成功
+HTTP 401 登入失敗
 
 return
 	- error (string)
@@ -114,18 +119,19 @@ return
 	- email
 	- verified
 	- rank
-	- cats
+	- cats (int)
 ```
 
 ```
-/POST/logout
+/POST/logout (登出)✅
 	- session
 
 刪除 session
 更新最後登入時間
 
+HTTP 200 成功
+
 return
-	- ok
 	- error
 ```
 
@@ -209,6 +215,8 @@ return
 更新資料庫
 ```
 
+### friend
+
 ```
 /POST/friends_position
 	- session
@@ -241,31 +249,26 @@ return
 		- cats (朋友捕獲的貓咪數量)
 ```
 
-```
-/POST/decline_friend
-	- session
-	- friend_uid
-
-檢查是否登入
-修改資料庫 (刪除 friend -> me)
-return
-	- ok
-```
 
 ```
-/POST/delete_friend
+/POST/friend/delete ✅
 	- session
 	- friend_uid
 
 檢查是否登入
 修改資料庫 src->dest 刪除
 如果 dest->src 是封鎖狀態，不刪除
+
+HTTP 401 (未登入)
+HTTP 200 請求成功，修改沒成功
+HTTP 201 成功修改
+
 return
 	- ok
 ```
 
 ```
-/POST/ban_friend
+/POST/friend/ban
 	- session
 	- ban_uid
 	
@@ -273,27 +276,58 @@ return
 修改資料庫
 刪除雙方友誼關係
 src->dest 關係改為封鎖狀態
+
+HTTP 401 (未登入)
+HTTP 200 請求成功，修改沒成功
+HTTP 201 成功修改
+
 return
 	- ok
 ```
 
 ```
-/POST/allow_friend
+/POST/friend/agree ✅
 	- session
 	- friend_uid
 
 檢查是否登入
 修改資料庫 (允許該筆資料)，並且反過來增加一筆資料
+
+HTTP 401 (未登入)
+HTTP 200 請求成功，修改沒成功
+HTTP 201 成功修改
+
 return
 	- ok
 ```
 
 ```
-/POST/friends_list
+/POST/friend/decline ✅
+	- session
+	- friend_uid
+
+檢查是否登入
+修改資料庫 (刪除 friend -> me)
+
+HTTP 401 (未登入)
+HTTP 200 請求成功，修改沒成功
+HTTP 201 成功修改
+
+return
+	- ok
+```
+
+```
+/POST/friends/list ✅
 	- session
 
 檢查是否登入
+
+HTTP 401 (未登入)
+HTTP 200
+
 return
+	- error
 	- list
 		- name
 		- uid
@@ -302,12 +336,17 @@ return
 ```
 
 ```
-/POST/inviting_me_list
+/POST/friends/inviting_me ✅
 	- session
 
 檢查是否登入
+
+HTTP 401 (未登入)
+HTTP 200
+
 return
-	-list
+	- error
+	- list
 		- name
 		- uid
 		- level
@@ -315,22 +354,28 @@ return
 ```
 
 ```
-/POST/add_frined
+/POST/friend/invite ✅
 	- session
 	- finding_uid
-	
+
 檢查是否登入
+HTTP 401 如果沒有登入
+
 如果該用戶被封鎖回傳找不到
 
+HTTP 200 成功，但可能找不到
+HTTP 201 成功，成功建立資源
+
 return
-	- ok
 	- error
 ```
 
 ### cat, theme
 
 ```
-/GET/theme_list
+/GET/theme_list ✅
+
+HTTP 200 成功
 
 回傳主題
 	- error
