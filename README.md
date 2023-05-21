@@ -10,16 +10,17 @@ Powered by Golang
 
 + `cat_kind_id` *int* **key** (auto-generated)
 + `name` *string* 
++ `thumbnail` *string*
 + `description` *string*
 + `weight` *int*
 
 ### cat
 
 + `cat_id` *int* **key** (auto-generated)
-+ `cat_kind_id` *int* **foreign key**
++ `cat_kind_id` *int*
 + `lng` *float64* (經度)
 + `lat` *float64* (緯度)
-+ `theme_id` *int* **foreign key**
++ `theme_id` *int*
 
 ### theme
 
@@ -30,8 +31,8 @@ Powered by Golang
 
 ### user_cat
 
-+ `user_id` *int* **foreign key**
-+ `cat_id` *int* **foreign key**
++ `user_id` *int*
++ `cat_id` *int*
 + `timing` *int*
 
 ### user
@@ -46,6 +47,7 @@ Powered by Golang
 + `last_login` *uint64*
 + `last_lng` *float64* (使用者同意下才可存取)
 + `last_lat` *float64* (使用者同意下才可存取)
++ `share_gps` *bool*  (是否允許朋友取得位置)
 + `verified` *boolean* (是否通過郵箱驗證)
 
 ### verify_email
@@ -118,8 +120,9 @@ return
 	- profile
 	- email
 	- verified
-	- rank
-	- cats (int)
+	- level 
+	- score 
+	- cats
 ```
 
 ```
@@ -154,7 +157,7 @@ return
 ```
 
 ```
-/POST/modify_user_password (更新用戶密碼)
+/POST/user/modify/password (更新用戶密碼)
 	- session
 	- uid
     - original_password
@@ -174,7 +177,7 @@ return
 ```
 
 ```
-/POST/modify_user_name (更新用戶名)
+/POST/user/modify/username (更新用戶名)
 	- session
 	- uid
 	- name
@@ -188,7 +191,7 @@ return
 ```
 
 ```
-/POST/modify_user_email (更新 email)
+/POST/user/modify/email (更新 email)
 	- uid
 	- email
 
@@ -197,28 +200,47 @@ return
 ```
 
 ```
-/GET/verify_email (確定更新 email)
+/POST/user/update/gps (更新定位)
+	- session
+	- lat
+	- lng
+
+檢查是否登入
+
+更新資料庫
+```
+
+```
+/POST/user/update/share_gps (更新是否讓朋友取得定位)
+	- session
+
+檢查是否登入
+更新資料庫
+
+HTTP 401 (未登入)
+HTTP 200 請求成功，修改沒成功
+HTTP 201 成功修改
+
+return
+	- error
+```
+
+
+
+```
+/GET/verify/email (確定更新 email)
 	- token
 	
 檢查資料庫
 修改資料庫
 ```
 
-```
-/POST/update_position
-	- session
-	- lat
-	- lng
-	
-檢查是否登入
 
-更新資料庫
-```
 
 ### friend
 
 ```
-/POST/friends_position
+/POST/friends/position
 	- session
 
 檢查是否登入
@@ -234,7 +256,7 @@ return
 ```
 
 ```
-/POST/friends_theme_rank (查尋某個主題中自己及朋友的分數)
+/POST/friends/theme_rank (查尋某個主題中自己及朋友的分數)
 	- session
 	- theme_id
 
@@ -264,7 +286,7 @@ HTTP 200 請求成功，修改沒成功
 HTTP 201 成功修改
 
 return
-	- ok
+	- error
 ```
 
 ```
@@ -298,7 +320,7 @@ HTTP 200 請求成功，修改沒成功
 HTTP 201 成功修改
 
 return
-	- ok
+	- error
 ```
 
 ```
@@ -314,7 +336,7 @@ HTTP 200 請求成功，修改沒成功
 HTTP 201 成功修改
 
 return
-	- ok
+	- error
 ```
 
 ```
@@ -386,8 +408,9 @@ HTTP 200 成功
 ```
 
 ```
-/GET/theme
+/POST/theme/ ✅
 	- theme_id
+	- session
 
 檢查是否登入
 
@@ -396,28 +419,35 @@ HTTP 200 成功
 	- cat_list
 		- cat_id
 		- cat_kind_id
+		- name   (貓貓名字)
+		- description (貓貓對應的描述)
 		- weight (貓咪對應分數)
 		- lng
 		- lat
-		- caught (是否已被使用者捕獲)
+		- thumbnail (貓貓的照片)
+		- is_caught (是否已被使用者捕獲)
 ```
 
 ```
-/POST/add_caught_cat
+/POST/cat/catching
 	- cat_id
+	- session
 
 檢查是否登入
 修改資料庫(新增已抓到的貓)
 
+HTTP 401 沒有登入
+HTTP 200 成功
+
 return 
-	- ok
 	- error
 ```
 
 ```
-/GET/my_caught_cat_kind (用來處理圖鑑)
+/GET/cat/my_caught_kind (用來處理圖鑑)
 
 檢查是否登入
+
 
 return
 	- cat_list

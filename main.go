@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ksw2000/catch_cat_server/cats"
 	"github.com/ksw2000/catch_cat_server/config"
 	"github.com/ksw2000/catch_cat_server/friends"
 	"github.com/ksw2000/catch_cat_server/user"
@@ -26,6 +27,7 @@ func main() {
 	r.POST("/friend/agree", friends.PostFriendAgree)
 	r.POST("/friend/decline", friends.PostFriendDecline)
 	r.POST("/friend/delete", friends.PostFriendDelete)
+	r.POST("/theme", cats.PostTheme)
 	r.GET("/me", user.GetMe)
 	r.GET("/theme_list", getThemeList)
 	r.Run("localhost:8080") // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")

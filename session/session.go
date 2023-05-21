@@ -1,6 +1,9 @@
 package session
 
 import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"github.com/ksw2000/catch_cat_server/util"
 )
 
@@ -38,4 +41,17 @@ func Get(token string) (value map[string]interface{}, ok bool) {
 
 func Destroy(token string) {
 	delete(bucket, token)
+}
+
+func CheckLogin(c *gin.Context, sessionID string) (uid uint64, isLogin bool) {
+	val, isLogin := Get(sessionID)
+	if !isLogin {
+		c.IndentedJSON(http.StatusUnauthorized, struct {
+			Error string `json:"error"`
+		}{"未登入"})
+		return
+	}
+
+	uid = val["uid"].(uint64)
+	return
 }

@@ -30,7 +30,7 @@ func PostFriendInvite(c *gin.Context) {
 	}
 	defer db.Close()
 
-	uid, isLogin := checkLogin(c, req.Session)
+	uid, isLogin := session.CheckLogin(c, req.Session)
 	if !isLogin {
 		return
 	}
@@ -123,7 +123,7 @@ func postFriends(c *gin.Context, status int) {
 		return
 	}
 
-	uid, isLogin := checkLogin(c, req.Session)
+	uid, isLogin := session.CheckLogin(c, req.Session)
 	if !isLogin {
 		return
 	}
@@ -202,7 +202,7 @@ func PostFriendDecline(c *gin.Context) {
 		return
 	}
 
-	uid, isLogin := checkLogin(c, req.Session)
+	uid, isLogin := session.CheckLogin(c, req.Session)
 	if !isLogin {
 		return
 	}
@@ -245,7 +245,7 @@ func PostFriendAgree(c *gin.Context) {
 		return
 	}
 
-	uid, isLogin := checkLogin(c, req.Session)
+	uid, isLogin := session.CheckLogin(c, req.Session)
 	if !isLogin {
 		return
 	}
@@ -313,7 +313,7 @@ func PostFriendDelete(c *gin.Context) {
 		return
 	}
 
-	uid, isLogin := checkLogin(c, req.Session)
+	uid, isLogin := session.CheckLogin(c, req.Session)
 	if !isLogin {
 		return
 	}
@@ -356,17 +356,4 @@ func PostFriendDelete(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusCreated, res)
-}
-
-func checkLogin(c *gin.Context, sessionID string) (uid uint64, isLogin bool) {
-	val, isLogin := session.Get(sessionID)
-	if !isLogin {
-		c.IndentedJSON(http.StatusUnauthorized, struct {
-			Error string `json:"error"`
-		}{"未登入"})
-		return
-	}
-
-	uid = val["uid"].(uint64)
-	return
 }

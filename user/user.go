@@ -27,19 +27,20 @@ func GetMe(c *gin.Context) {
 		Uid      uint64 `json:"uid"`
 		Profile  string `json:"profile"`
 		Email    string `json:"email"`
-		Rank     int    `json:"rank"`
 		Verified bool   `json:"verified"`
+		Score    int    `json:"score"`
+		Level    int    `json:"level"`
 		Cats     int    `json:"cats"`
 	}{}
 	if err := c.BindJSON(&req); err != nil {
 		return
 	}
 
-	val, ok := session.Get(req.Session)
-	if !ok {
-		c.IndentedJSON(http.StatusOK, res)
+	uid, isLogin := session.CheckLogin(c, req.Session)
+	if !isLogin {
 		return
 	}
+	res.Uid = uid
 
 	db, err := sql.Open("sqlite3", config.MainDB)
 	if err != nil {
@@ -49,7 +50,6 @@ func GetMe(c *gin.Context) {
 	}
 	defer db.Close()
 
-	res.Uid = val["uid"].(uint64)
 	row := db.QueryRow("SELECT name, profile, email, verified FROM user WHERE `user_id` = ?", res.Uid)
 	if err := row.Scan(&res.Name, &res.Profile, &res.Email, &res.Email, &res.Verified); err != nil {
 		res.Error = "database error row.Scan() error"
@@ -57,9 +57,7 @@ func GetMe(c *gin.Context) {
 		return
 	}
 
-	// TODO
-	res.Rank = 0
-	res.Cats = 0
+	res.Cats, res.Score, res.Level = getScoreAndLevel(db, res.Uid)
 
 	res.IsLogin = true
 	c.IndentedJSON(http.StatusOK, res)
@@ -168,8 +166,9 @@ func PostLogin(c *gin.Context) {
 		Uid      uint64 `json:"uid"`
 		Profile  string `json:"profile"`
 		Email    string `json:"email"`
-		Rank     int    `json:"rank"`
 		Verified bool   `json:"verified"`
+		Score    int    `json:"score"`
+		Level    int    `json:"level"`
 		Cats     int    `json:"cats"`
 	}{}
 
@@ -206,9 +205,8 @@ func PostLogin(c *gin.Context) {
 		return
 	}
 
-	// TODO
-	res.Rank = 0
-	res.Cats = 0
+	res.Cats, res.Score, res.Level = getScoreAndLevel(db, res.Uid)
+
 	res.Session = session.NewSession()
 	val, _ := session.Get(res.Session)
 	val["uid"] = res.Uid
@@ -227,12 +225,10 @@ func PostLogout(c *gin.Context) {
 		return
 	}
 
-	val, ok := session.Get(req.Session)
-	if !ok {
-		c.IndentedJSON(http.StatusOK, res)
+	uid, isLogin := session.CheckLogin(c, req.Session)
+	if !isLogin {
 		return
 	}
-	uid := val["uid"].(uint64)
 
 	db, err := sql.Open("sqlite3", config.MainDB)
 	if err != nil {
@@ -250,4 +246,18 @@ func PostLogout(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, res)
+}
+
+func getScoreAndLevel(db *sql.DB, uid uint64) (cats int, score int, level int) {
+	// 1 level = 100 score
+	row := db.QueryRow(`
+		SELECT SUM(cat_kind.weight), COUNT(user_cat.cat_id)
+		FROM cat_kind, cat, user_cat 
+		WHERE 
+		user_cat.cat_id = cat.cat_id and 
+		cat.cat_kind_id = cat_kind.cat_kind_id and
+		user_cat.user_id = ?`, uid)
+	row.Scan(&score, &cats)
+	level = score / 100
+	return cats, score, level
 }
