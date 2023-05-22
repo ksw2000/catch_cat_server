@@ -28,6 +28,7 @@ func GetMe(c *gin.Context) {
 		Profile  string `json:"profile"`
 		Email    string `json:"email"`
 		Verified bool   `json:"verified"`
+		ShareGPS bool   `json:"share_gps"`
 		Score    int    `json:"score"`
 		Level    int    `json:"level"`
 		Cats     int    `json:"cats"`
@@ -50,8 +51,8 @@ func GetMe(c *gin.Context) {
 	}
 	defer db.Close()
 
-	row := db.QueryRow("SELECT name, profile, email, verified FROM user WHERE `user_id` = ?", res.Uid)
-	if err := row.Scan(&res.Name, &res.Profile, &res.Email, &res.Email, &res.Verified); err != nil {
+	row := db.QueryRow("SELECT name, profile, email, verified, share_gps FROM user WHERE `user_id` = ?", res.Uid)
+	if err := row.Scan(&res.Name, &res.Profile, &res.Email, &res.Email, &res.Verified, &res.ShareGPS); err != nil {
 		res.Error = "database error row.Scan() error"
 		c.IndentedJSON(http.StatusOK, res)
 		return
@@ -167,6 +168,7 @@ func PostLogin(c *gin.Context) {
 		Profile  string `json:"profile"`
 		Email    string `json:"email"`
 		Verified bool   `json:"verified"`
+		ShareGPS bool   `json:"share_gps"`
 		Score    int    `json:"score"`
 		Level    int    `json:"level"`
 		Cats     int    `json:"cats"`
@@ -198,8 +200,8 @@ func PostLogin(c *gin.Context) {
 		return
 	}
 
-	row = db.QueryRow("SELECT name, user_id, profile, email, verified FROM user WHERE `email` = ?", req.Email)
-	if err := row.Scan(&res.Name, &res.Uid, &res.Profile, &res.Email, &res.Verified); err != nil {
+	row = db.QueryRow("SELECT name, user_id, profile, email, verified, share_gps FROM user WHERE `email` = ?", req.Email)
+	if err := row.Scan(&res.Name, &res.Uid, &res.Profile, &res.Email, &res.Verified, &res.ShareGPS); err != nil {
 		res.Error = fmt.Sprintf("database error row.Scan() error %v", err)
 		c.IndentedJSON(http.StatusOK, res)
 		return
@@ -214,6 +216,85 @@ func PostLogin(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, res)
 }
 
+func PostUpdateShareGPS(c *gin.Context) {
+	req := struct {
+		Session    string `json:"session"`
+		ShareOrNot bool   `json:"share_or_not"`
+	}{}
+	res := struct {
+		Error string `json:"error"`
+	}{}
+	if err := c.BindJSON(&req); err != nil {
+		return
+	}
+	uid, isLogin := session.CheckLogin(c, req.Session)
+	if !isLogin {
+		return
+	}
+	db, err := sql.Open("sqlite3", config.MainDB)
+	if err != nil {
+		res.Error = fmt.Sprintf("sql.Open() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer db.Close()
+
+	stmt, err := db.Prepare("UPDATE user SET share_gps = ? WHERE user_id = ?")
+	if err != nil {
+		res.Error = fmt.Sprintf("db.Prepare() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	if _, err := stmt.Exec(req.ShareOrNot, uid); err != nil {
+		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	c.IndentedJSON(http.StatusCreated, res)
+}
+
+func PostUpdateGPS(c *gin.Context) {
+	req := struct {
+		Session string  `json:"session"`
+		Lat     float64 `json:"lat"`
+		Lng     float64 `json:"lng"`
+	}{}
+	res := struct {
+		Error string `json:"error"`
+	}{}
+	if err := c.BindJSON(&req); err != nil {
+		return
+	}
+	uid, isLogin := session.CheckLogin(c, req.Session)
+	if !isLogin {
+		return
+	}
+	db, err := sql.Open("sqlite3", config.MainDB)
+	if err != nil {
+		res.Error = fmt.Sprintf("sql.Open() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer db.Close()
+
+	stmt, err := db.Prepare("UPDATE user SET last_lng = ?, last_lat = ? WHERE user_id = ?")
+	if err != nil {
+		res.Error = fmt.Sprintf("db.Prepare() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	if _, err := stmt.Exec(req.Lng, req.Lat, uid); err != nil {
+		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	c.IndentedJSON(http.StatusCreated, res)
+}
+
+func PostUpdateSetGPSOrNot() {
+
+}
+
 func PostLogout(c *gin.Context) {
 	req := struct {
 		Session string `json:"session"`
@@ -225,10 +306,12 @@ func PostLogout(c *gin.Context) {
 		return
 	}
 
-	uid, isLogin := session.CheckLogin(c, req.Session)
+	val, isLogin := session.Get(req.Session)
 	if !isLogin {
 		return
 	}
+
+	uid := val["uid"].(uint64)
 
 	db, err := sql.Open("sqlite3", config.MainDB)
 	if err != nil {

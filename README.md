@@ -120,6 +120,7 @@ return
 	- profile
 	- email
 	- verified
+	- share_gps
 	- level 
 	- score 
 	- cats
@@ -151,13 +152,14 @@ return
 	- uid
 	- profile
 	- email
+	- share_gps
 	- verified
 	- rank
 	- cats
 ```
 
 ```
-/POST/user/modify/password (更新用戶密碼)
+/POST/user/update/password (更新用戶密碼)
 	- session
 	- uid
     - original_password
@@ -177,7 +179,7 @@ return
 ```
 
 ```
-/POST/user/modify/username (更新用戶名)
+/POST/user/update/username (更新用戶名)
 	- session
 	- uid
 	- name
@@ -191,7 +193,7 @@ return
 ```
 
 ```
-/POST/user/modify/email (更新 email)
+/POST/user/update/email (更新 email)
 	- uid
 	- email
 
@@ -200,19 +202,23 @@ return
 ```
 
 ```
-/POST/user/update/gps (更新定位)
+/POST/user/update/gps (更新定位) ✅
 	- session
 	- lat
 	- lng
 
-檢查是否登入
+檢查是否登入 (取得 uid)
+HTTP 401 (未登入)
+HTTP 200 請求成功，修改沒成功
+HTTP 201 成功修改
 
 更新資料庫
 ```
 
 ```
-/POST/user/update/share_gps (更新是否讓朋友取得定位)
+/POST/user/update/share_gps (更新是否讓朋友取得定位) ✅
 	- session
+	- share_or_not
 
 檢查是否登入
 更新資料庫
@@ -240,17 +246,18 @@ return
 ### friend
 
 ```
-/POST/friends/position
+/POST/friends/position ✅
 	- session
 
 檢查是否登入
 查尋朋友位置
 
-return 
+返回朋友的位置訊息
 	- error
-	- position_list
-		- name (朋友名字)
-		- uid (朋友 id)
+	- list
+	    - uid
+		- name
+		- last_login
 		- lat
 		- lng
 ```
@@ -266,8 +273,9 @@ return
 return
 	- error
 	- sorted_rank_list
-		- name (朋友名字)
 		- uid (朋友 id)
+		- name (朋友名字)
+		- last_login
 		- cats (朋友捕獲的貓咪數量)
 ```
 
@@ -408,7 +416,7 @@ HTTP 200 成功
 ```
 
 ```
-/POST/theme/ ✅
+/POST/theme ✅
 	- theme_id
 	- session
 
@@ -429,7 +437,7 @@ HTTP 200 成功
 ```
 
 ```
-/POST/cat/catching
+/POST/cat/catching ✅
 	- cat_id
 	- session
 
@@ -437,7 +445,8 @@ HTTP 200 成功
 修改資料庫(新增已抓到的貓)
 
 HTTP 401 沒有登入
-HTTP 200 成功
+HTTP 200 請求成功但中間有bug
+HTTP 201 成功
 
 return 
 	- error

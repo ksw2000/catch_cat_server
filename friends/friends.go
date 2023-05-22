@@ -100,6 +100,7 @@ func PostFriendInvite(c *gin.Context) {
 const (
 	friendList     = 0
 	invitingMeList = 1
+	friendPosition = 2
 )
 
 func postFriends(c *gin.Context, status int) {
@@ -107,10 +108,12 @@ func postFriends(c *gin.Context, status int) {
 		Session string `json:"session"`
 	}{}
 	type Friend struct {
-		Name      string `json:"name"`
-		Uid       int    `json:"uid"`
-		Level     int    `json:"level"`
-		LastLogin int    `json:"last_login"`
+		Name      string  `json:"name"`
+		Uid       int     `json:"uid"`
+		Level     int     `json:"level"`
+		LastLogin int     `json:"last_login"`
+		Lat       float64 `json:"lat"`
+		Lng       float64 `json:"lng"`
 	}
 	res := struct {
 		Error string   `json:"error"`
@@ -143,7 +146,7 @@ func postFriends(c *gin.Context, status int) {
 			SELECT 
 				friend.user_id_dest as fid,
 				user.name as name,
-				user.last_login as last_login
+				user.last_login
 			FROM friend, user
 			WHERE 
 				user.user_id = friend.user_id_dest and
@@ -151,18 +154,34 @@ func postFriends(c *gin.Context, status int) {
 				friend.ban = 0     and
 				friend.user_id_src = ?
 		`, uid)
-	} else {
+	} else if status == invitingMeList {
 		rows, err = db.Query(`
 			SELECT 
 				friend.user_id_src as fid,
 				user.name as name,
-				user.last_login as last_login
+				user.last_login
 			FROM friend, user
 			WHERE 
 				user.user_id = friend.user_id_src and
 				friend.accepted = 0 and
 				friend.ban = 0   and
 				friend.user_id_dest = ?
+		`, uid)
+	} else if status == friendPosition {
+		rows, err = db.Query(`
+			SELECT 
+				friend.user_id_dest as fid,
+				user.name as name,
+				user.last_login,
+				user.last_lat,
+				user.last_lng
+			FROM friend, user
+			WHERE 
+				user.user_id = friend.user_id_dest and
+				friend.accepted = 1 and
+				friend.ban = 0      and
+				user.share_gps = 1  and
+				friend.user_id_src = ?
 		`, uid)
 	}
 
@@ -174,7 +193,11 @@ func postFriends(c *gin.Context, status int) {
 
 	for rows.Next() {
 		friend := Friend{}
-		rows.Scan(&friend.Uid, &friend.Name, &friend.LastLogin)
+		if status == friendPosition {
+			rows.Scan(&friend.Uid, &friend.Name, &friend.LastLogin, &friend.Lat, &friend.Lng)
+		} else {
+			rows.Scan(&friend.Uid, &friend.Name, &friend.LastLogin)
+		}
 		res.List = append(res.List, friend)
 	}
 
@@ -187,6 +210,10 @@ func PostFriendsList(c *gin.Context) {
 
 func PostInvitingMeList(c *gin.Context) {
 	postFriends(c, invitingMeList)
+}
+
+func PostFriendsPosition(c *gin.Context) {
+	postFriends(c, friendPosition)
 }
 
 func PostFriendDecline(c *gin.Context) {
