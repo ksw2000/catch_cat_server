@@ -159,11 +159,10 @@ return
 ```
 
 ```
-/POST/user/update/password (更新用戶密碼)
+/POST/user/update/password (更新用戶密碼) ✅
 	- session
-	- uid
     - original_password
-    - password
+    - new_password
     - confirm_password
 
 檢查是否已登入
@@ -179,13 +178,15 @@ return
 ```
 
 ```
-/POST/user/update/username (更新用戶名)
+/POST/user/update/name (更新用戶名) ✅
 	- session
-	- uid
 	- name
 
 檢查是否已登入
 寫入資料庫
+
+HTTP 200 成功，但不符合規定
+HTTP 201 成功，成功建立資源
 
 return
 	- ok (boolean)
@@ -193,9 +194,12 @@ return
 ```
 
 ```
-/POST/user/update/email (更新 email)
+/POST/user/update/email (更新 email) ✅
 	- uid
 	- email
+
+檢查 email 格式 ❌
+(寄發 email 確認：太麻煩先跳過)  ❌
 
 檢查是否已登入
 (寄發 email 確認：太麻煩先跳過 → 直接寫進資料庫)
@@ -231,8 +235,6 @@ return
 	- error
 ```
 
-
-
 ```
 /GET/verify/email (確定更新 email)
 	- token
@@ -240,8 +242,6 @@ return
 檢查資料庫
 修改資料庫
 ```
-
-
 
 ### friend
 
@@ -257,25 +257,31 @@ return
 	- list
 	    - uid
 		- name
+		- profile
 		- last_login
 		- lat
 		- lng
 ```
 
 ```
-/POST/friends/theme_rank (查尋某個主題中自己及朋友的分數)
+/POST/friends/theme_rank (查尋某個主題中自己及朋友的分數) ✅
 	- session
 	- theme_id
 
 檢查是否登入
 查尋朋友的貓貓清單
 
+HTTP 401 (未登入)
+HTTP 200 (成功)
+
 return
 	- error
 	- sorted_rank_list
-		- uid (朋友 id)
-		- name (朋友名字)
+		- uid
+		- name
+		- profile
 		- last_login
+		- score (朋友捕獲猫咪的對應得分)
 		- cats (朋友捕獲的貓咪數量)
 ```
 
@@ -361,6 +367,7 @@ return
 	- list
 		- name
 		- uid
+		- profile
 		- level
 		- last_login
 ```
@@ -379,6 +386,7 @@ return
 	- list
 		- name
 		- uid
+		- profile
 		- level
 		- last_login
 ```

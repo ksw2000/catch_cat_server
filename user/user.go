@@ -79,8 +79,9 @@ func PostRegister(c *gin.Context) {
 		log.Print(err)
 		return
 	}
-	if len(req.Name) > 12 && len(req.Name) <= 0 {
-		res.Error = "名稱需介於 1~12 字元"
+
+	if err := checkName(req.Name); err != nil {
+		res.Error = err.Error()
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
@@ -91,13 +92,18 @@ func PostRegister(c *gin.Context) {
 		return
 	}
 
-	if err := util.PasswordFormatChecker(req.Password); err != nil {
+	if err := checkPasswordFormat(req.Password); err != nil {
 		res.Error = err.Error()
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
 
-	// TODO: check email
+	if err := checkEmailFormat(req.Email); err != nil {
+		res.Error = err.Error()
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+
 	// TODO: send email
 
 	db, err := sql.Open("sqlite3", config.MainDB)
@@ -216,6 +222,167 @@ func PostLogin(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, res)
 }
 
+func PostUpdateName(c *gin.Context) {
+	req := struct {
+		Session string `json:"session"`
+		Name    string `json:"name"`
+	}{}
+	res := struct {
+		Error string `json:"error"`
+	}{}
+
+	if err := c.BindJSON(&req); err != nil {
+		return
+	}
+
+	uid, isLogin := session.CheckLogin(c, req.Session)
+	if !isLogin {
+		return
+	}
+
+	if err := checkName(req.Name); err != nil {
+		res.Error = err.Error()
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+
+	db, err := sql.Open("sqlite3", config.MainDB)
+	if err != nil {
+		res.Error = fmt.Sprintf("sql.Open() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer db.Close()
+	stmt, err := db.Prepare("UPDATE user SET name = ? WHERE user_id = ?")
+	if err != nil {
+		res.Error = fmt.Sprintf("db.Prepare() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer stmt.Close()
+	if _, err := stmt.Exec(req.Name, uid); err != nil {
+		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	c.IndentedJSON(http.StatusCreated, res)
+}
+
+func PostUpdateEmail(c *gin.Context) {
+	req := struct {
+		Session string `json:"session"`
+		Email   string `json:"email"`
+	}{}
+	res := struct {
+		Error string `json:"error"`
+	}{}
+
+	if err := c.BindJSON(&req); err != nil {
+		return
+	}
+
+	uid, isLogin := session.CheckLogin(c, req.Session)
+	if !isLogin {
+		return
+	}
+
+	if err := checkEmailFormat(req.Email); err != nil {
+		res.Error = err.Error()
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+
+	db, err := sql.Open("sqlite3", config.MainDB)
+	if err != nil {
+		res.Error = fmt.Sprintf("sql.Open() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer db.Close()
+	stmt, err := db.Prepare("UPDATE user SET email = ?, verified = 0 WHERE user_id = ? and email <> ?")
+	if err != nil {
+		res.Error = fmt.Sprintf("db.Prepare() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer stmt.Close()
+	if _, err := stmt.Exec(req.Email, uid, req.Email); err != nil {
+		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	c.IndentedJSON(http.StatusCreated, res)
+}
+
+func PostUpdatePassword(c *gin.Context) {
+	req := struct {
+		Session          string `json:"session"`
+		OriginalPassword string `json:"original_password"`
+		ConfirmPassword  string `json:"confirm_password"`
+		NewPassword      string `json:"new_password"`
+	}{}
+	res := struct {
+		Error string `json:"error"`
+	}{}
+
+	if err := c.BindJSON(&req); err != nil {
+		return
+	}
+
+	uid, isLogin := session.CheckLogin(c, req.Session)
+	if !isLogin {
+		return
+	}
+
+	// check if NewPassword == ConfirmPassword
+	if req.NewPassword != req.ConfirmPassword {
+		res.Error = "確認密碼與密碼不符合"
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+
+	db, err := sql.Open("sqlite3", config.MainDB)
+	if err != nil {
+		res.Error = fmt.Sprintf("sql.Open() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer db.Close()
+
+	// check password
+	var hashedPassword, salt string
+	row := db.QueryRow("SELECT password, salt FROM user WHERE user_id = ?", uid)
+	if err := row.Scan(&hashedPassword, &salt); err != nil {
+		res.Error = fmt.Sprintf("請重新登入 %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+
+	if hashedPassword != util.PasswordHash(req.OriginalPassword, salt) {
+		res.Error = "密碼錯誤"
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+
+	// update
+	salt = util.RandomString(256)
+	hashedPassword = util.PasswordHash(req.NewPassword, salt)
+	stmt, err := db.Prepare("UPDATE user SET salt = ?, password = ? WHERE user_id = ?")
+	if err != nil {
+		res.Error = fmt.Sprintf("db.Prepare() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer stmt.Close()
+
+	if _, err := stmt.Exec(salt, hashedPassword, uid); err != nil {
+		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	c.IndentedJSON(http.StatusCreated, res)
+}
+
 func PostUpdateShareGPS(c *gin.Context) {
 	req := struct {
 		Session    string `json:"session"`
@@ -245,6 +412,8 @@ func PostUpdateShareGPS(c *gin.Context) {
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
+	defer stmt.Close()
+
 	if _, err := stmt.Exec(req.ShareOrNot, uid); err != nil {
 		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
 		c.IndentedJSON(http.StatusOK, res)
@@ -291,10 +460,6 @@ func PostUpdateGPS(c *gin.Context) {
 	c.IndentedJSON(http.StatusCreated, res)
 }
 
-func PostUpdateSetGPSOrNot() {
-
-}
-
 func PostLogout(c *gin.Context) {
 	req := struct {
 		Session string `json:"session"`
@@ -308,6 +473,8 @@ func PostLogout(c *gin.Context) {
 
 	val, isLogin := session.Get(req.Session)
 	if !isLogin {
+		// already logout
+		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
 

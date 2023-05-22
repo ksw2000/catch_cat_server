@@ -11,6 +11,16 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+type Friend struct {
+	Name      string  `json:"name"`
+	Uid       int     `json:"uid"`
+	Profile   string  `json:"profile"`
+	Level     int     `json:"level"`
+	LastLogin int     `json:"last_login"`
+	Lat       float64 `json:"lat"`
+	Lng       float64 `json:"lng"`
+}
+
 func PostFriendInvite(c *gin.Context) {
 	req := struct {
 		Session    string `json:"session"`
@@ -107,14 +117,7 @@ func postFriends(c *gin.Context, status int) {
 	req := struct {
 		Session string `json:"session"`
 	}{}
-	type Friend struct {
-		Name      string  `json:"name"`
-		Uid       int     `json:"uid"`
-		Level     int     `json:"level"`
-		LastLogin int     `json:"last_login"`
-		Lat       float64 `json:"lat"`
-		Lng       float64 `json:"lng"`
-	}
+
 	res := struct {
 		Error string   `json:"error"`
 		List  []Friend `json:"list"`
@@ -145,7 +148,8 @@ func postFriends(c *gin.Context, status int) {
 		rows, err = db.Query(`
 			SELECT 
 				friend.user_id_dest as fid,
-				user.name as name,
+				user.name,
+				user.profile,
 				user.last_login
 			FROM friend, user
 			WHERE 
@@ -158,7 +162,8 @@ func postFriends(c *gin.Context, status int) {
 		rows, err = db.Query(`
 			SELECT 
 				friend.user_id_src as fid,
-				user.name as name,
+				user.name,
+				user.profile,
 				user.last_login
 			FROM friend, user
 			WHERE 
@@ -171,7 +176,8 @@ func postFriends(c *gin.Context, status int) {
 		rows, err = db.Query(`
 			SELECT 
 				friend.user_id_dest as fid,
-				user.name as name,
+				user.name,
+				user.profile,
 				user.last_login,
 				user.last_lat,
 				user.last_lng
@@ -194,9 +200,9 @@ func postFriends(c *gin.Context, status int) {
 	for rows.Next() {
 		friend := Friend{}
 		if status == friendPosition {
-			rows.Scan(&friend.Uid, &friend.Name, &friend.LastLogin, &friend.Lat, &friend.Lng)
+			rows.Scan(&friend.Uid, &friend.Name, &friend.Profile, &friend.LastLogin, &friend.Lat, &friend.Lng)
 		} else {
-			rows.Scan(&friend.Uid, &friend.Name, &friend.LastLogin)
+			rows.Scan(&friend.Uid, &friend.Name, &friend.Profile, &friend.LastLogin)
 		}
 		res.List = append(res.List, friend)
 	}
@@ -383,4 +389,101 @@ func PostFriendDelete(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusCreated, res)
+}
+
+type Rank struct {
+	Uid       int    `json:"uid"`
+	Name      string `json:"name"`
+	Profile   string `json:"profile"`
+	LastLogin int    `json:"last_login"`
+	Score     int    `json:"score"`
+	Cats      int    `json:"cats"`
+}
+
+func PostFriendRankAtTheme(c *gin.Context) {
+	req := struct {
+		Session string `json:"session"`
+		ThemeID int    `json:"theme_id"`
+	}{}
+
+	res := struct {
+		Error string `json:"error"`
+		List  []Rank `json:"sorted_list"`
+	}{
+		List: []Rank{},
+	}
+
+	if err := c.BindJSON(&req); err != nil {
+		return
+	}
+
+	uid, isLogin := session.CheckLogin(c, req.Session)
+	if !isLogin {
+		return
+	}
+
+	db, err := sql.Open("sqlite3", config.MainDB)
+	if err != nil {
+		res.Error = fmt.Sprintf("sql.Open() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer db.Close()
+
+	rows, err := db.Query(`
+	SELECT
+		ta.*,
+		SUM(tb.weight) as score,
+		COUNT(tb.cat_id) as cats
+	FROM
+		(
+			SELECT
+				user.user_id,
+				user.name,
+				user.profile,
+				user.last_login
+				FROM user, friend
+			WHERE 
+				(
+					friend.user_id_src = ? and
+					friend.user_id_dest = user.user_id and 
+					friend.accepted = 1 AND
+					friend.ban = 0
+				) UNION
+			SELECT
+				user.user_id,
+				user.name,
+				user.profile,
+				user.last_login
+			FROM user
+			WHERE user.user_id = ?
+		) as ta
+	LEFT JOIN
+		(
+			SELECT *
+			FROM user_cat, cat, cat_kind
+			WHERE
+				user_cat.cat_id = cat.cat_id and
+				cat.cat_kind_id = cat_kind.cat_kind_id and
+				cat.theme_id = ?
+		) as tb
+		ON
+			tb.user_id = ta.user_id
+	GROUP BY ta.user_id
+	ORDER BY score DESC`, uid, uid, req.ThemeID)
+
+	if err != nil {
+		res.Error = fmt.Sprintf("db.Query() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		rank := Rank{}
+		rows.Scan(&rank.Uid, &rank.Name, &rank.Profile, &rank.LastLogin, &rank.Score, &rank.Cats)
+		res.List = append(res.List, rank)
+	}
+
+	c.IndentedJSON(http.StatusOK, res)
 }
