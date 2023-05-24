@@ -16,7 +16,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func GetMe(c *gin.Context) {
+func PostMe(c *gin.Context) {
 	req := struct {
 		Session string `json:"session"`
 	}{}
@@ -51,14 +51,14 @@ func GetMe(c *gin.Context) {
 	}
 	defer db.Close()
 
-	row := db.QueryRow("SELECT name, profile, email, verified, share_gps FROM user WHERE `user_id` = ?", res.Uid)
-	if err := row.Scan(&res.Name, &res.Profile, &res.Email, &res.Email, &res.Verified, &res.ShareGPS); err != nil {
+	row := db.QueryRow("SELECT name, profile, email, verified, share_gps FROM user WHERE user_id = ?", res.Uid)
+	if err := row.Scan(&res.Name, &res.Profile, &res.Email, &res.Verified, &res.ShareGPS); err != nil {
 		res.Error = "database error row.Scan() error"
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
 
-	res.Cats, res.Score, res.Level = getScoreAndLevel(db, res.Uid)
+	res.Cats, res.Score, res.Level = util.GetScoreAndLevel(db, res.Uid)
 
 	res.IsLogin = true
 	c.IndentedJSON(http.StatusOK, res)
@@ -213,7 +213,7 @@ func PostLogin(c *gin.Context) {
 		return
 	}
 
-	res.Cats, res.Score, res.Level = getScoreAndLevel(db, res.Uid)
+	res.Cats, res.Score, res.Level = util.GetScoreAndLevel(db, res.Uid)
 
 	res.Session = session.NewSession()
 	val, _ := session.Get(res.Session)
@@ -498,16 +498,42 @@ func PostLogout(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, res)
 }
 
-func getScoreAndLevel(db *sql.DB, uid uint64) (cats int, score int, level int) {
-	// 1 level = 100 score
-	row := db.QueryRow(`
-		SELECT SUM(cat_kind.weight), COUNT(user_cat.cat_id)
-		FROM cat_kind, cat, user_cat 
-		WHERE 
-		user_cat.cat_id = cat.cat_id and 
-		cat.cat_kind_id = cat_kind.cat_kind_id and
-		user_cat.user_id = ?`, uid)
-	row.Scan(&score, &cats)
-	level = score / 100
-	return cats, score, level
+func PostUpdateProfile(c *gin.Context) {
+	req := struct {
+		Session string `json:"session"`
+		Path    string `json:"path"`
+	}{}
+	res := struct {
+		Error string `json:"error"`
+	}{}
+
+	if err := c.BindJSON(&req); err != nil {
+		return
+	}
+
+	uid, isLogin := session.CheckLogin(c, req.Session)
+	if !isLogin {
+		c.IndentedJSON(http.StatusUnauthorized, res)
+		return
+	}
+
+	db, err := sql.Open("sqlite3", config.MainDB)
+	if err != nil {
+		res.Error = fmt.Sprintf("sql.Open() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer db.Close()
+	stmt, err := db.Prepare("UPDATE user SET profile = ? WHERE user_id = ?")
+	if err != nil {
+		res.Error = fmt.Sprintf("db.Prepare() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	if _, err := stmt.Exec(req.Path, uid); err != nil {
+		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	c.IndentedJSON(http.StatusCreated, res)
 }

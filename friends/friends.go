@@ -8,17 +8,22 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ksw2000/catch_cat_server/config"
 	"github.com/ksw2000/catch_cat_server/session"
+	"github.com/ksw2000/catch_cat_server/util"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 type Friend struct {
-	Name      string  `json:"name"`
-	Uid       int     `json:"uid"`
-	Profile   string  `json:"profile"`
-	Level     int     `json:"level"`
-	LastLogin int     `json:"last_login"`
-	Lat       float64 `json:"lat"`
-	Lng       float64 `json:"lng"`
+	Name       string  `json:"name"`
+	Uid        uint64  `json:"uid"`
+	Profile    string  `json:"profile"`
+	Level      int     `json:"level"`
+	Score      int     `json:"score"`
+	Cats       int     `json:"cats"`
+	LastLogin  int     `json:"last_login"`
+	ThemeScore int     `json:"theme_score"` // optional
+	ThemeCats  int     `json:"theme_cats"`  // optional
+	Lat        float64 `json:"lat"`         // optional
+	Lng        float64 `json:"lng"`         // optional
 }
 
 func PostFriendInvite(c *gin.Context) {
@@ -111,11 +116,13 @@ const (
 	friendList     = 0
 	invitingMeList = 1
 	friendPosition = 2
+	themeRank      = 3
 )
 
 func postFriends(c *gin.Context, status int) {
 	req := struct {
 		Session string `json:"session"`
+		ThemeID int    `json:"theme_id"`
 	}{}
 
 	res := struct {
@@ -173,22 +180,98 @@ func postFriends(c *gin.Context, status int) {
 				friend.user_id_dest = ?
 		`, uid)
 	} else if status == friendPosition {
+		// rows, err = db.Query(`
+		// 	SELECT
+		// 		friend.user_id_dest as fid,
+		// 		user.name,
+		// 		user.profile,
+		// 		user.last_login,
+		// 		user.last_lat,
+		// 		user.last_lng
+		// 	FROM friend, user
+		// 	WHERE
+		// 		user.user_id = friend.user_id_dest and
+		// 		friend.accepted = 1 and
+		// 		friend.ban = 0      and
+		// 		user.share_gps = 1  and
+		// 		friend.user_id_src = ?
+		// `, uid)
 		rows, err = db.Query(`
-			SELECT 
-				friend.user_id_dest as fid,
-				user.name,
-				user.profile,
-				user.last_login,
-				user.last_lat,
-				user.last_lng
-			FROM friend, user
-			WHERE 
-				user.user_id = friend.user_id_dest and
-				friend.accepted = 1 and
-				friend.ban = 0      and
-				user.share_gps = 1  and
-				friend.user_id_src = ?
-		`, uid)
+			SELECT
+				ta.*,
+				SUM(tb.weight) as score,
+				COUNT(tb.cat_id) as cats
+			FROM
+				(
+					SELECT
+						user.user_id,
+						user.name,
+						user.profile,
+						user.last_login,
+						user.last_lat,
+						user.last_lng
+						FROM user, friend
+					WHERE 
+						friend.user_id_src = ? and
+						friend.user_id_dest = user.user_id and 
+						friend.accepted = 1 AND
+						friend.ban = 0
+				) as ta
+			LEFT JOIN
+				(
+					SELECT *
+					FROM user_cat, cat, cat_kind
+					WHERE
+						user_cat.cat_id = cat.cat_id and
+						cat.cat_kind_id = cat_kind.cat_kind_id and
+						cat.theme_id = ?
+				) as tb
+				ON
+					tb.user_id = ta.user_id
+			GROUP BY ta.user_id
+			ORDER BY score DESC`, uid, req.ThemeID)
+	} else if status == themeRank {
+		rows, err = db.Query(`
+			SELECT
+				ta.*,
+				SUM(tb.weight) as score,
+				COUNT(tb.cat_id) as cats
+			FROM
+				(
+					SELECT
+						user.user_id,
+						user.name,
+						user.profile,
+						user.last_login
+						FROM user, friend
+					WHERE 
+						(
+							friend.user_id_src = ? and
+							friend.user_id_dest = user.user_id and 
+							friend.accepted = 1 AND
+							friend.ban = 0
+						) UNION
+					SELECT
+						user.user_id,
+						user.name,
+						user.profile,
+						user.last_login
+					FROM user
+					WHERE user.user_id = ?
+				) as ta
+			LEFT JOIN
+				(
+					SELECT *
+					FROM user_cat, cat, cat_kind
+					WHERE
+						user_cat.cat_id = cat.cat_id and
+						cat.cat_kind_id = cat_kind.cat_kind_id and
+						cat.theme_id = ?
+				) as tb
+				ON
+					tb.user_id = ta.user_id
+			GROUP BY ta.user_id
+			ORDER BY score DESC`, uid, uid, req.ThemeID)
 	}
 
 	if err != nil {
@@ -200,10 +283,13 @@ func postFriends(c *gin.Context, status int) {
 	for rows.Next() {
 		friend := Friend{}
 		if status == friendPosition {
-			rows.Scan(&friend.Uid, &friend.Name, &friend.Profile, &friend.LastLogin, &friend.Lat, &friend.Lng)
+			rows.Scan(&friend.Uid, &friend.Name, &friend.Profile, &friend.LastLogin, &friend.Lat, &friend.Lng, &friend.ThemeScore, &friend.ThemeCats)
+		} else if status == themeRank {
+			rows.Scan(&friend.Uid, &friend.Name, &friend.Profile, &friend.LastLogin, &friend.ThemeScore, &friend.ThemeCats)
 		} else {
 			rows.Scan(&friend.Uid, &friend.Name, &friend.Profile, &friend.LastLogin)
 		}
+		friend.Cats, friend.Score, friend.Level = util.GetScoreAndLevel(db, friend.Uid)
 		res.List = append(res.List, friend)
 	}
 
@@ -220,6 +306,10 @@ func PostInvitingMeList(c *gin.Context) {
 
 func PostFriendsPosition(c *gin.Context) {
 	postFriends(c, friendPosition)
+}
+
+func PostFriendRankAtTheme(c *gin.Context) {
+	postFriends(c, themeRank)
 }
 
 func PostFriendDecline(c *gin.Context) {
@@ -389,101 +479,4 @@ func PostFriendDelete(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusCreated, res)
-}
-
-type Rank struct {
-	Uid       int    `json:"uid"`
-	Name      string `json:"name"`
-	Profile   string `json:"profile"`
-	LastLogin int    `json:"last_login"`
-	Score     int    `json:"score"`
-	Cats      int    `json:"cats"`
-}
-
-func PostFriendRankAtTheme(c *gin.Context) {
-	req := struct {
-		Session string `json:"session"`
-		ThemeID int    `json:"theme_id"`
-	}{}
-
-	res := struct {
-		Error string `json:"error"`
-		List  []Rank `json:"sorted_list"`
-	}{
-		List: []Rank{},
-	}
-
-	if err := c.BindJSON(&req); err != nil {
-		return
-	}
-
-	uid, isLogin := session.CheckLogin(c, req.Session)
-	if !isLogin {
-		return
-	}
-
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
-
-	rows, err := db.Query(`
-	SELECT
-		ta.*,
-		SUM(tb.weight) as score,
-		COUNT(tb.cat_id) as cats
-	FROM
-		(
-			SELECT
-				user.user_id,
-				user.name,
-				user.profile,
-				user.last_login
-				FROM user, friend
-			WHERE 
-				(
-					friend.user_id_src = ? and
-					friend.user_id_dest = user.user_id and 
-					friend.accepted = 1 AND
-					friend.ban = 0
-				) UNION
-			SELECT
-				user.user_id,
-				user.name,
-				user.profile,
-				user.last_login
-			FROM user
-			WHERE user.user_id = ?
-		) as ta
-	LEFT JOIN
-		(
-			SELECT *
-			FROM user_cat, cat, cat_kind
-			WHERE
-				user_cat.cat_id = cat.cat_id and
-				cat.cat_kind_id = cat_kind.cat_kind_id and
-				cat.theme_id = ?
-		) as tb
-		ON
-			tb.user_id = ta.user_id
-	GROUP BY ta.user_id
-	ORDER BY score DESC`, uid, uid, req.ThemeID)
-
-	if err != nil {
-		res.Error = fmt.Sprintf("db.Query() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		rank := Rank{}
-		rows.Scan(&rank.Uid, &rank.Name, &rank.Profile, &rank.LastLogin, &rank.Score, &rank.Cats)
-		res.List = append(res.List, rank)
-	}
-
-	c.IndentedJSON(http.StatusOK, res)
 }

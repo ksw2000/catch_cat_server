@@ -2,13 +2,17 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path"
 
 	"github.com/ksw2000/catch_cat_server/cats"
 	"github.com/ksw2000/catch_cat_server/config"
 	"github.com/ksw2000/catch_cat_server/friends"
 	"github.com/ksw2000/catch_cat_server/user"
+	"github.com/ksw2000/catch_cat_server/util"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
@@ -35,9 +39,12 @@ func main() {
 	r.POST("/user/update/email", user.PostUpdateEmail)
 	r.POST("/user/update/gps", user.PostUpdateGPS)
 	r.POST("/user/update/share_gps", user.PostUpdateShareGPS)
+	r.POST("/user/update/profile", user.PostUpdateProfile)
 	r.POST("/cat/catching", cats.PostCatching)
-	r.GET("/me", user.GetMe)
+	r.POST("/me", user.PostMe)
+	r.POST("/upload/profile", uploadProfile)
 	r.GET("/theme_list", getThemeList)
+	r.Static("/images", "./images")
 	r.Run("localhost:8080") // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 }
 
@@ -93,4 +100,32 @@ func getThemeList(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, res)
+}
+
+func uploadProfile(c *gin.Context) {
+	file, _ := c.FormFile("profile")
+	res := struct {
+		Error string `json:"error"`
+		Path  string `json:"path"`
+	}{}
+
+	// generate file name
+	res.Path = path.Join(config.UploadRoot, fmt.Sprintf("%s%s", util.RandomString(15), path.Ext(file.Filename)))
+	for fileExist(res.Path) {
+		res.Path = path.Join(config.UploadRoot, fmt.Sprintf("%s%s", util.RandomString(15), path.Ext(file.Filename)))
+	}
+
+	if err := c.SaveUploadedFile(file, res.Path); err != nil {
+		res.Error = fmt.Sprintf("upload fail %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+
+	res.Path = "/" + res.Path
+	c.IndentedJSON(http.StatusCreated, res)
+}
+
+func fileExist(path string) bool {
+	_, err := os.Stat(path)
+	return !errors.Is(err, os.ErrNotExist)
 }

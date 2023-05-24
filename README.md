@@ -236,6 +236,22 @@ return
 ```
 
 ```
+/POST/user/update/profile (更新頭貼) ✅
+	- session
+	- path
+	
+檢查是否登入
+更新資料庫
+
+HTTP 401 (未登入)
+HTTP 200 請求成功，修改沒成功
+HTTP 201 成功修改
+
+return
+	- error
+```
+
+```
 /GET/verify/email (確定更新 email)
 	- token
 	
@@ -244,24 +260,6 @@ return
 ```
 
 ### friend
-
-```
-/POST/friends/position ✅
-	- session
-
-檢查是否登入
-查尋朋友位置
-
-返回朋友的位置訊息
-	- error
-	- list
-	    - uid
-		- name
-		- profile
-		- last_login
-		- lat
-		- lng
-```
 
 ```
 /POST/friends/theme_rank (查尋某個主題中自己及朋友的分數) ✅
@@ -276,13 +274,13 @@ HTTP 200 (成功)
 
 return
 	- error
-	- sorted_rank_list
+	- list
 		- uid
 		- name
 		- profile
 		- last_login
-		- score (朋友捕獲猫咪的對應得分)
-		- cats (朋友捕獲的貓咪數量)
+		- theme_score (朋友捕獲猫咪的對應得分)
+		- theme_cats (朋友捕獲的貓咪數量)
 ```
 
 
@@ -365,10 +363,12 @@ HTTP 200
 return
 	- error
 	- list
-		- name
 		- uid
+		- name
 		- profile
 		- level
+		- cats
+		- score
 		- last_login
 ```
 
@@ -384,11 +384,35 @@ HTTP 200
 return
 	- error
 	- list
+		- uid
+		- name
+		- profile
+		- level
+		- cats
+		- score
+		- last_login
+```
+
+```
+/POST/friends/position ✅ (取得地址，若有附加主題 id，獲取主題中獲得的貓咪數)
+	- session
+	- (optional) theme_id
+
+檢查是否登入
+查尋朋友位置
+
+返回朋友的位置訊息
+	- error
+	- list
 		- name
 		- uid
 		- profile
 		- level
+		- cats
+		- score
 		- last_login
+		- lat
+		- lng
 ```
 
 ```
@@ -472,5 +496,17 @@ return
 		- weight (貓咪對應分數)
 		- name
 		- description
+```
+
+```
+/POST/upload/profile ✅
+	- profile
+
+HTTP 200 請求成功但有 bug
+HTTP 201 成功
+
+return
+	- error
+	- path
 ```
 
