@@ -480,22 +480,27 @@ HTTP 401 沒有登入
 HTTP 200 請求成功但中間有bug
 HTTP 201 成功
 
-return 
+return
 	- error
 ```
 
 ```
-/GET/cat/my_caught_kind (用來處理圖鑑)
+/POST/cat/my_caught_kind (用來處理圖鑑) ✅
+	- session
 
-檢查是否登入
+檢查是否登入 
 
+HTTP 401 沒有登入
+HTTP 200 請求成功
 
 return
-	- cat_list
+	- error
+	- list
 		- cat_kind_id
-		- weight (貓咪對應分數)
 		- name
+		- thumbnail
 		- description
+		- weight (貓咪對應分數)
 ```
 
 ```

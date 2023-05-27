@@ -41,6 +41,7 @@ func main() {
 	r.POST("/user/update/share_gps", user.PostUpdateShareGPS)
 	r.POST("/user/update/profile", user.PostUpdateProfile)
 	r.POST("/cat/catching", cats.PostCatching)
+	r.POST("/cat/my_caught_kind", cats.PostCaughtKind)
 	r.POST("/me", user.PostMe)
 	r.POST("/upload/profile", uploadProfile)
 	r.GET("/theme_list", getThemeList)

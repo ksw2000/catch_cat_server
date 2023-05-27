@@ -279,6 +279,7 @@ func postFriends(c *gin.Context, status int) {
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		friend := Friend{}
@@ -414,6 +415,7 @@ func PostFriendAgree(c *gin.Context) {
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
+	defer stmt.Close()
 	if _, err := stmt.Exec(req.FriendUID, uid); err != nil {
 		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
 		c.IndentedJSON(http.StatusOK, res)
