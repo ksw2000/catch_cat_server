@@ -140,7 +140,7 @@ return
 ```
 
 ```
-/GET/me (查尋登入狀態)
+/POST/user/me (查尋登入狀態)
 	- session
 
 查尋 session 如果已登入
@@ -156,6 +156,15 @@ return
 	- verified
 	- rank
 	- cats
+```
+
+```
+/POST/user/update/last_login (更新上線時間)✅
+
+HTTP 201 請求成功、更新成功
+
+return
+	- error
 ```
 
 ```

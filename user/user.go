@@ -64,6 +64,48 @@ func PostMe(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, res)
 }
 
+func PostUpdateLastLogin(c *gin.Context) {
+	req := struct {
+		Session string `json:"session"`
+	}{}
+	if err := c.BindJSON(&req); err != nil {
+		return
+	}
+	res := struct {
+		Error string `json:"error"`
+	}{}
+
+	uid, isLogin := session.CheckLogin(c, req.Session)
+	if !isLogin {
+		return
+	}
+
+	db, err := sql.Open("sqlite3", config.MainDB)
+	if err != nil {
+		res.Error = fmt.Sprintf("sql.Open() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer db.Close()
+
+	stmt, err := db.Prepare("UPDATE user SET last_login = ? WHERE user_id = ?")
+	if err != nil {
+		res.Error = fmt.Sprintf("db.Prepare() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(time.Now().Unix(), uid)
+	if err != nil {
+		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
+		c.IndentedJSON(http.StatusOK, res)
+		return
+	}
+
+	c.IndentedJSON(http.StatusCreated, res)
+}
+
 func PostRegister(c *gin.Context) {
 	req := struct {
 		Password        string `json:"password"`
