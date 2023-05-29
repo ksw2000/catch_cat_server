@@ -170,31 +170,28 @@ func PostRegister(c *gin.Context) {
 	}
 
 	// check if there are the same user_id in db
-	uid := uint64(rand.Float64()*900000000000. + 100000000000.)
+	uid := uint64(rand.Float64()*9000000000. + 1000000000.)
 
 	for count := 1; count != 0; {
 		row := db.QueryRow("SELECT COUNT(*) FROM user WHERE `user_id` = ?", uid)
-		if err := row.Scan(&count); err != nil {
-			res.Error = fmt.Sprintf("db.QueryRow() error %v", err)
-			c.IndentedJSON(http.StatusOK, res)
-			return
-		}
-
+		row.Scan(&count)
 		// generate again
-		uid = uint64(rand.Float64()*900000000000. + 100000000000.)
+		uid = uint64(rand.Float64()*9000000000. + 1000000000.)
 	}
 
-	stmt, err := db.Prepare("INSERT INTO user(user_id, salt, password, name, profile, email, creating, last_login, verified) values(?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	stmt, err := db.Prepare(`
+		INSERT INTO user(user_id, salt, password, name, profile, email, creating, last_login, last_lng, last_lat, verified, share_gps) 
+		values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		res.Error = fmt.Sprintf("db.Prepare() error %v", err)
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
-	stmt.Close()
+	defer stmt.Close()
 
 	salt := util.RandomString(256)
 	hashedPassword := util.PasswordHash(req.Password, salt)
-	if _, err = stmt.Exec(uid, salt, hashedPassword, req.Name, "", req.Email, time.Now().Unix(), time.Now().Unix(), false); err != nil {
+	if _, err = stmt.Exec(uid, salt, hashedPassword, req.Name, "", req.Email, time.Now().Unix(), time.Now().Unix(), 0, 0, false, false); err != nil {
 		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
 		c.IndentedJSON(http.StatusOK, res)
 		return
@@ -238,7 +235,7 @@ func PostLogin(c *gin.Context) {
 	var hashedPassword, salt string
 	row := db.QueryRow("SELECT password, salt FROM user WHERE `email` = ?", req.Email)
 	if err := row.Scan(&hashedPassword, &salt); err != nil {
-		res.Error = fmt.Sprintf("尚未註冊 %v", err)
+		res.Error = "尚未註冊"
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
