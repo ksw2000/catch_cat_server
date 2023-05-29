@@ -2,6 +2,7 @@ package user
 
 import (
 	"fmt"
+	"net/mail"
 	"regexp"
 )
 
@@ -31,6 +32,6 @@ func checkPasswordFormat(pwd string) error {
 }
 
 func checkEmailFormat(email string) error {
-	// TODO
-	return nil
+	_, err := mail.ParseAddress(email)
+	return err
 }

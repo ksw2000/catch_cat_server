@@ -190,6 +190,7 @@ func PostRegister(c *gin.Context) {
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
+	stmt.Close()
 
 	salt := util.RandomString(256)
 	hashedPassword := util.PasswordHash(req.Password, salt)
@@ -494,6 +495,7 @@ func PostUpdateGPS(c *gin.Context) {
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
+	defer stmt.Close()
 	if _, err := stmt.Exec(req.Lng, req.Lat, uid); err != nil {
 		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
 		c.IndentedJSON(http.StatusOK, res)
@@ -536,6 +538,7 @@ func PostLogout(c *gin.Context) {
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
+	defer stmt.Close()
 
 	c.IndentedJSON(http.StatusOK, res)
 }
@@ -572,6 +575,7 @@ func PostUpdateProfile(c *gin.Context) {
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
+	defer stmt.Close()
 	if _, err := stmt.Exec(req.Path, uid); err != nil {
 		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
 		c.IndentedJSON(http.StatusOK, res)

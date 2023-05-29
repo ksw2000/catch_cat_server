@@ -95,6 +95,7 @@ func getThemeList(c *gin.Context) {
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
+	defer rows.Close()
 	for rows.Next() {
 		theme := Theme{}
 		rows.Scan(&theme.ThemeID, &theme.Name, &theme.Thumbnail, &theme.Description)

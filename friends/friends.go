@@ -102,6 +102,7 @@ func PostFriendInvite(c *gin.Context) {
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
+	defer stmt.Close()
 	if _, err = stmt.Exec(uid, req.FindingUID, false, false); err != nil {
 		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
 		c.IndentedJSON(http.StatusOK, res)
@@ -402,6 +403,7 @@ func PostFriendAgree(c *gin.Context) {
 		c.IndentedJSON(http.StatusOK, res)
 		return
 	}
+	defer stmt.Close()
 	if _, err := stmt.Exec(uid, req.FriendUID, true, false); err != nil {
 		res.Error = fmt.Sprintf("stmt.Exec() error %v", err)
 		c.IndentedJSON(http.StatusOK, res)
