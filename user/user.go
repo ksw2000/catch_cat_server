@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"time"
 
@@ -170,13 +169,14 @@ func PostRegister(c *gin.Context) {
 	}
 
 	// check if there are the same user_id in db
-	uid := uint64(rand.Float64()*9000000000. + 1000000000.)
+	var uid uint64
 
 	for count := 1; count != 0; {
+		// generate
+		uid = util.GenerateID()
+		// check
 		row := db.QueryRow("SELECT COUNT(*) FROM user WHERE `user_id` = ?", uid)
 		row.Scan(&count)
-		// generate again
-		uid = uint64(rand.Float64()*9000000000. + 1000000000.)
 	}
 
 	stmt, err := db.Prepare(`

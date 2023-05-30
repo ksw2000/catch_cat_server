@@ -38,3 +38,9 @@ func GetScoreAndLevel(db *sql.DB, uid uint64) (cats int, score int, level int) {
 	level = score / 100
 	return cats, score, level
 }
+
+func GenerateID() uint64 {
+	s1 := rand.NewSource(time.Now().UnixNano())
+	r1 := rand.New(s1)
+	return r1.Uint64()%900000000000 + 100000000000
+}
