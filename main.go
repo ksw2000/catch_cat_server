@@ -19,6 +19,7 @@ import (
 )
 
 func main() {
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(CORSMiddleware())
 
@@ -47,7 +48,20 @@ func main() {
 	r.POST("/upload/profile", uploadProfile)
 	r.GET("/theme_list", getThemeList)
 	r.Static("/images", "./images")
-	r.Run("localhost:8080") // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+	r.Static("/icons", "./web/icons")
+	r.Static("/assets", "./web/assets")
+
+	// for website
+	r.LoadHTMLFiles("./web/index.html")
+	r.StaticFile("/main.dart.js", "./web/main.dart.js")
+	r.StaticFile("/flutter.js", "./web/flutter.js")
+	r.StaticFile("/manifest.json", "./web/manifest.json")
+	r.StaticFile("/favicon.png", "./web/favicon.png")
+	r.GET("/", func(context *gin.Context) {
+		context.HTML(http.StatusOK, "index.html", nil)
+	})
+
+	r.Run(":8080")
 }
 
 // https://stackoverflow.com/questions/29418478/go-gin-framework-cors
