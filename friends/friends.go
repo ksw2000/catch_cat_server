@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ksw2000/catch_cat_server/config"
 	"github.com/ksw2000/catch_cat_server/session"
 	"github.com/ksw2000/catch_cat_server/util"
 	_ "github.com/mattn/go-sqlite3"
@@ -37,13 +36,8 @@ func PostFriendInvite(c *gin.Context) {
 	if err := c.BindJSON(&req); err != nil {
 		return
 	}
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+
+	db := util.OpenDB()
 
 	uid, isLogin := session.CheckLogin(c, req.Session)
 	if !isLogin {
@@ -142,14 +136,9 @@ func postFriends(c *gin.Context, status int) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
+	var err error
 	var rows *sql.Rows
 
 	if status == friendList {
@@ -332,13 +321,7 @@ func PostFriendDecline(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	// if friend_id invites uid, delete the record
 	stmt, err := db.Prepare("DELETE from friend WHERE user_id_src = ? and user_id_dest = ? and accepted = ?")
@@ -375,13 +358,7 @@ func PostFriendAgree(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	// ensure that friend_uid invite uid
 	row := db.QueryRow("SELECT COUNT(*) FROM friend WHERE user_id_src = ? and user_id_dest = ? and accepted = 0", req.FriendUID, uid)
@@ -445,13 +422,7 @@ func PostFriendDelete(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	// delete uid -> friend_uid
 	stmt, err := db.Prepare("DELETE from friend WHERE user_id_src = ? and user_id_dest = ?")

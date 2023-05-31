@@ -1,13 +1,11 @@
 package user
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 
-	"github.com/ksw2000/catch_cat_server/config"
 	"github.com/ksw2000/catch_cat_server/session"
 	"github.com/ksw2000/catch_cat_server/util"
 
@@ -42,13 +40,7 @@ func PostMe(c *gin.Context) {
 	}
 	res.Uid = uid
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	row := db.QueryRow("SELECT name, profile, email, verified, share_gps FROM user WHERE user_id = ?", res.Uid)
 	if err := row.Scan(&res.Name, &res.Profile, &res.Email, &res.Verified, &res.ShareGPS); err != nil {
@@ -79,13 +71,7 @@ func PostUpdateLastLogin(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	stmt, err := db.Prepare("UPDATE user SET last_login = ? WHERE user_id = ?")
 	if err != nil {
@@ -147,13 +133,7 @@ func PostRegister(c *gin.Context) {
 
 	// TODO: send email
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	// check if there are the same email in db
 	var count int
@@ -224,13 +204,7 @@ func PostLogin(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	var hashedPassword, salt string
 	row := db.QueryRow("SELECT password, salt FROM user WHERE `email` = ?", req.Email)
@@ -286,13 +260,8 @@ func PostUpdateName(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
+
 	stmt, err := db.Prepare("UPDATE user SET name = ? WHERE user_id = ?")
 	if err != nil {
 		res.Error = fmt.Sprintf("db.Prepare() error %v", err)
@@ -332,13 +301,8 @@ func PostUpdateEmail(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
+
 	stmt, err := db.Prepare("UPDATE user SET email = ?, verified = 0 WHERE user_id = ? and email <> ?")
 	if err != nil {
 		res.Error = fmt.Sprintf("db.Prepare() error %v", err)
@@ -381,13 +345,7 @@ func PostUpdatePassword(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	// check password
 	var hashedPassword, salt string
@@ -438,13 +396,7 @@ func PostUpdateShareGPS(c *gin.Context) {
 	if !isLogin {
 		return
 	}
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	stmt, err := db.Prepare("UPDATE user SET share_gps = ? WHERE user_id = ?")
 	if err != nil {
@@ -478,13 +430,8 @@ func PostUpdateGPS(c *gin.Context) {
 	if !isLogin {
 		return
 	}
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+
+	db := util.OpenDB()
 
 	stmt, err := db.Prepare("UPDATE user SET last_lng = ?, last_lat = ? WHERE user_id = ?")
 	if err != nil {
@@ -521,13 +468,7 @@ func PostLogout(c *gin.Context) {
 
 	uid := val["uid"].(uint64)
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	stmt, _ := db.Prepare("UPDATE user SET last_login=? WHERE user_id=?")
 	if _, err := stmt.Exec(time.Now().Unix(), uid); err != nil {
@@ -559,13 +500,8 @@ func PostUpdateProfile(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
+
 	stmt, err := db.Prepare("UPDATE user SET profile = ? WHERE user_id = ?")
 	if err != nil {
 		res.Error = fmt.Sprintf("db.Prepare() error %v", err)

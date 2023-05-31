@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,6 +18,11 @@ import (
 )
 
 func main() {
+	// open database
+	util.OpenDB()
+	defer util.CloseDB()
+
+	// prepare gin router
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(CORSMiddleware())
@@ -51,7 +55,7 @@ func main() {
 	r.Static("/icons", "./web/icons")
 	r.Static("/assets", "./web/assets")
 
-	// for website
+	// router for website
 	r.LoadHTMLFiles("./web/index.html")
 	r.StaticFile("/main.dart.js", "./web/main.dart.js")
 	r.StaticFile("/flutter.js", "./web/flutter.js")
@@ -61,6 +65,7 @@ func main() {
 		context.HTML(http.StatusOK, "index.html", nil)
 	})
 
+	// start server
 	r.Run(":8080")
 }
 
@@ -95,13 +100,7 @@ func getThemeList(c *gin.Context) {
 		List: []Theme{},
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	rows, err := db.Query("SELECT theme_id, name, thumbnail, description FROM theme")
 	if err != nil {

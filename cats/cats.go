@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ksw2000/catch_cat_server/config"
 	"github.com/ksw2000/catch_cat_server/session"
+	"github.com/ksw2000/catch_cat_server/util"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
@@ -49,13 +49,7 @@ func PostTheme(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	rows, err := db.Query(`
 		SELECT cat.cat_id, cat.cat_kind_id, cat.lng, cat.lat, 
@@ -104,13 +98,7 @@ func PostCatching(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	// insert
 	stmt, err := db.Prepare("INSERT INTO user_cat(user_id, cat_id, timing) values(?, ?, ?)")
@@ -154,13 +142,7 @@ func PostCaughtKind(c *gin.Context) {
 		return
 	}
 
-	db, err := sql.Open("sqlite3", config.MainDB)
-	if err != nil {
-		res.Error = fmt.Sprintf("sql.Open() error %v", err)
-		c.IndentedJSON(http.StatusOK, res)
-		return
-	}
-	defer db.Close()
+	db := util.OpenDB()
 
 	rows, err := db.Query(`SELECT 
 		cat_kind.cat_kind_id,
